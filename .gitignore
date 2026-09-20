@@ -1,0 +1,30 @@
+# Secrets - never commit these
+.env
+*.key
+
+# Virtual environment - large and rebuildable
+.venv/
+venv/
+
+# Python generated files
+__pycache__/
+*.pyc
+*.pyo
+
+# Database dumps - hundreds of megabytes
+*.sql
+!schema.sql
+cinemate_dump.sql
+
+# Local data
+data/raw/
+data/processed/
+
+# Editor and OS clutter
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Evaluation output images
+evaluation/results/*.png
