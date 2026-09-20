@@ -1,0 +1,40 @@
+# Web services and message validation
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
+python-dotenv==1.0.1
+requests==2.32.3
+
+# Agent communication protocol
+mcp==1.2.0
+
+# Database
+psycopg[binary]==3.2.3
+pgvector==0.3.6
+
+# Information retrieval
+rank-bm25==0.2.2
+sentence-transformers==3.1.1
+numpy==1.26.4
+pandas==2.2.3
+scikit-learn==1.5.2
+
+# Natural language processing
+spacy==3.7.6
+transformers==4.44.2
+torch==2.4.1
+
+# Security
+python-jose[cryptography]==3.3.0
+passlib==1.7.4
+bcrypt==4.0.1
+cryptography==43.0.1
+slowapi==0.1.9
+
+# Language model client
+groq==0.11.0
+
+# Interface and evaluation
+streamlit==1.39.0
+matplotlib==3.9.2
+pytest==8.3.3
