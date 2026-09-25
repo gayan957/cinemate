@@ -1,40 +1,83 @@
+# CineMate requirements
+#
+# REQUIRES PYTHON 3.11 OR 3.12. Not 3.13, not 3.14.
+#
+# Install:
+#   python3.11 -m venv .venv
+#   source .venv/bin/activate
+#   pip install --upgrade pip
+#   pip install -r requirements.txt
+#   python -m spacy download en_core_web_sm
+#   python check_env.py
+#
+# AFTER a successful install, lock the exact versions for the team:
+#   pip freeze > requirements.lock.txt
+#   git add requirements.lock.txt && git commit -m "Lock dependency versions"
+#
+# Teammates then install from the lock file instead:
+#   pip install -r requirements.lock.txt
+#
+# This file uses ranges so pip can resolve a working combination.
+# The lock file records exactly what it chose, so all four machines match.
+
+# ---------------------------------------------------------------
 # Web services and message validation
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
-pydantic==2.9.2
-python-dotenv==1.0.1
-requests==2.32.3
+# pydantic must be >=2.10.1 because mcp 1.x requires it
+# ---------------------------------------------------------------
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.30,<0.35
+pydantic>=2.10.1,<3
+python-dotenv>=1.0
+requests>=2.32
 
+# ---------------------------------------------------------------
 # Agent communication protocol
-mcp==1.2.0
+# CRITICAL: mcp 2.x renamed FastMCP to MCPServer and breaks our code
+# ---------------------------------------------------------------
+mcp>=1.2,<2
 
+# ---------------------------------------------------------------
 # Database
-psycopg[binary]==3.2.3
-pgvector==0.3.6
+# [binary] ships precompiled, so no C compiler is needed
+# ---------------------------------------------------------------
+psycopg[binary]>=3.2,<4
+pgvector>=0.3.6,<0.5
 
+# ---------------------------------------------------------------
 # Information retrieval
+# ---------------------------------------------------------------
 rank-bm25==0.2.2
-sentence-transformers==3.1.1
-numpy==1.26.4
-pandas==2.2.3
-scikit-learn==1.5.2
+sentence-transformers>=3.1,<5
+scikit-learn>=1.5,<2
+pandas>=2.2,<3
 
+# ---------------------------------------------------------------
 # Natural language processing
-spacy==3.7.6
-transformers==4.44.2
-torch==2.4.1
+# CRITICAL: transformers 5.x removed the summarization pipeline
+# spacy left open so pip picks a version with a prebuilt wheel
+# ---------------------------------------------------------------
+spacy>=3.7,<4
+transformers>=4.44,<5
+torch>=2.4,<3
 
+# ---------------------------------------------------------------
 # Security
-python-jose[cryptography]==3.3.0
+# CRITICAL: bcrypt 4.1+ breaks passlib's startup version check
+# ---------------------------------------------------------------
+python-jose[cryptography]>=3.3
 passlib==1.7.4
-bcrypt==4.0.1
-cryptography==43.0.1
-slowapi==0.1.9
+bcrypt>=4.0,<4.1
+cryptography>=43
+slowapi>=0.1.9
 
+# ---------------------------------------------------------------
 # Language model client
-groq==0.11.0
+# ---------------------------------------------------------------
+groq>=0.11
 
+# ---------------------------------------------------------------
 # Interface and evaluation
-streamlit==1.39.0
-matplotlib==3.9.2
-pytest==8.3.3
+# ---------------------------------------------------------------
+streamlit>=1.39,<2
+matplotlib>=3.9
+pytest>=8.3
