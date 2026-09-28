@@ -9,11 +9,18 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;    -- fuzzy title matching
 
 -- ---------------------------------------------------------------
--- Movies: one row per film, structured fields for SQL filtering
+-- Movies: one row per film or TV series, structured fields for SQL
+-- filtering. The table keeps its name so every agent still works.
+--
+-- For a TV series:
+--   title/year/release_date  come from the name and first air date
+--   runtime                  is the typical episode length
+--   age_rating               is the US TV rating, e.g. TV-14
 -- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS movies (
     id            SERIAL PRIMARY KEY,
-    tmdb_id       INTEGER UNIQUE NOT NULL,
+    media_type    TEXT NOT NULL DEFAULT 'movie',   -- movie | tv
+    tmdb_id       INTEGER NOT NULL,
     title         TEXT NOT NULL,
     original_title TEXT,
     year          INTEGER,
@@ -32,9 +39,29 @@ CREATE TABLE IF NOT EXISTS movies (
     cast_names    TEXT[],
     director      TEXT,
     poster_path   TEXT,
+    creator       TEXT,               -- TV only: who created the series
+    seasons       INTEGER,            -- TV only
+    episodes      INTEGER,            -- TV only
+    status        TEXT,               -- TV only: Ended, Returning Series...
+    network       TEXT,               -- TV only: first network, e.g. AMC
     ingested_at   TIMESTAMPTZ DEFAULT now()
 );
 
+-- Upgrade a database created before TV support. Safe to run again.
+ALTER TABLE movies ADD COLUMN IF NOT EXISTS media_type TEXT NOT NULL DEFAULT 'movie';
+ALTER TABLE movies ADD COLUMN IF NOT EXISTS creator  TEXT;
+ALTER TABLE movies ADD COLUMN IF NOT EXISTS seasons  INTEGER;
+ALTER TABLE movies ADD COLUMN IF NOT EXISTS episodes INTEGER;
+ALTER TABLE movies ADD COLUMN IF NOT EXISTS status   TEXT;
+ALTER TABLE movies ADD COLUMN IF NOT EXISTS network  TEXT;
+
+-- TMDB numbers films and series separately, so movie 1396 and
+-- tv 1396 are different titles. Unique per type, not globally.
+ALTER TABLE movies DROP CONSTRAINT IF EXISTS movies_tmdb_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_movies_type_tmdb
+    ON movies (media_type, tmdb_id);
+
+CREATE INDEX IF NOT EXISTS idx_movies_media   ON movies (media_type);
 CREATE INDEX IF NOT EXISTS idx_movies_year    ON movies (year);
 CREATE INDEX IF NOT EXISTS idx_movies_runtime ON movies (runtime);
 CREATE INDEX IF NOT EXISTS idx_movies_rating  ON movies (age_rating);

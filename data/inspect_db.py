@@ -30,6 +30,14 @@ def main():
                 cur.execute(f"SELECT count(*) AS n FROM {table}")
                 print(f"  {table:<10} {cur.fetchone()['n']:>8,}")
 
+            cur.execute("""
+                SELECT media_type, count(*) AS n
+                FROM movies GROUP BY media_type ORDER BY media_type
+            """)
+            for row in cur.fetchall():
+                label = "series" if row["media_type"] == "tv" else "films"
+                print(f"    {label:<8} {row['n']:>8,}")
+
             # ---------- size ----------
             show("DATABASE SIZE")
             cur.execute(
@@ -108,7 +116,8 @@ def main():
                 ("no country", "country IS NULL"),
                 ("no runtime", "runtime IS NULL OR runtime = 0"),
                 ("no year", "year IS NULL OR year = 0"),
-                ("no director", "director IS NULL"),
+                ("no director", "media_type = 'movie' AND director IS NULL"),
+                ("no creator", "media_type = 'tv' AND creator IS NULL"),
             ]
             for label, condition in checks:
                 cur.execute(f"SELECT count(*) AS n FROM movies WHERE {condition}")
@@ -134,12 +143,13 @@ def main():
             # ---------- sample ----------
             show("SAMPLE FILMS")
             cur.execute("""
-                SELECT title, year, runtime, age_rating, country,
+                SELECT title, year, runtime, age_rating, country, media_type,
                        array_length(genres, 1) AS n_genres
                 FROM movies ORDER BY popularity DESC NULLS LAST LIMIT 5
             """)
             for row in cur.fetchall():
-                print(f"  {row['title'][:34]:<34} {row['year']}  "
+                kind = "TV" if row["media_type"] == "tv" else "  "
+                print(f"  {kind} {row['title'][:31]:<31} {row['year']}  "
                       f"{row['runtime']}min  {row['age_rating']:<6} "
                       f"{row['country'] or '??'}")
 

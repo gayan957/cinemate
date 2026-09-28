@@ -24,18 +24,24 @@ def search_movies(
     genres: str = "",
     max_age_rating: str = "",
     variants: str = "",
+    media_type: str = "",
 ) -> list:
     """
-    Search the film corpus using hybrid retrieval.
+    Search the film and TV series corpus using hybrid retrieval.
 
     query: what the user is looking for, described in words
-    max_runtime: maximum length in minutes, 0 means no limit
-    min_year: earliest release year, 0 means no limit
+    max_runtime: maximum length in minutes (episode length for a series),
+        0 means no limit
+    min_year: earliest release or first air year, 0 means no limit
     genres: comma separated genre names, empty means any
-    max_age_rating: G, PG, PG-13 or R. Empty means no limit
+    max_age_rating: G, PG, PG-13 or R. Empty means no limit.
+        TV ratings are matched to the nearest film rating.
     variants: comma separated rewrites of the query, empty means none
+    media_type: movie or tv. Empty means both
     """
     filters = {}
+    if media_type:
+        filters["media_type"] = media_type
     if max_runtime > 0:
         filters["max_runtime"] = max_runtime
     if min_year > 0:
@@ -58,12 +64,17 @@ def search_with_relaxation(
     max_runtime: int = 0,
     min_year: int = 0,
     genres: str = "",
+    max_age_rating: str = "",
+    media_type: str = "",
 ) -> dict:
     """
     Search, and if nothing matches, drop the narrowest filter and retry.
 
     Returns the results plus a list of which filters were dropped, so
     the user can be told honestly.
+
+    max_age_rating and media_type are never dropped: one protects
+    younger users, the other is what the user explicitly asked for.
     """
     filters = {}
     if max_runtime > 0:
@@ -72,6 +83,10 @@ def search_with_relaxation(
         filters["min_year"] = min_year
     if genres:
         filters["genres"] = [g.strip() for g in genres.split(",") if g.strip()]
+    if max_age_rating:
+        filters["max_age_rating"] = max_age_rating
+    if media_type:
+        filters["media_type"] = media_type
 
     relaxed = []
 
@@ -92,7 +107,7 @@ def search_with_relaxation(
 
 @mcp.tool()
 def get_movie_details(doc_id: str) -> dict:
-    """Fetch the full record for one film by its document id, e.g. m412."""
+    """Fetch the full record for one film or series by its document id, e.g. m412."""
     try:
         movie_id = int(doc_id.lstrip("m"))
     except ValueError:

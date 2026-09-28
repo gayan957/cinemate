@@ -33,7 +33,8 @@ ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "")
 # ------------------------------------------------------------------
 # Models
 # ------------------------------------------------------------------
-LLM_MODEL = "llama-3.3-70b-versatile"
+LLM_MODEL = "openai/gpt-oss-120b"
+LLM_MODEL_FALLBACK = "openai/gpt-oss-20b"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 EMBEDDING_DIM = 384                    # must match VECTOR(384) in schema.sql
 RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
@@ -59,6 +60,9 @@ DEFAULT_METHOD = "full"
 # ------------------------------------------------------------------
 TMDB_BASE = "https://api.themoviedb.org/3"
 TMDB_DELAY = 0.25                      # seconds between requests
+MOVIE_PAGES = 300                      # 20 per page -> 6,000 films
+TV_PAGES = 200                         # 20 per page -> 4,000 series
+                                       # TMDB allows at most 500 pages
 MAX_REVIEWS_PER_MOVIE = 5
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 100

@@ -1,11 +1,16 @@
 """
-Fetch movies and reviews from TMDB and load them into Postgres.
+Fetch movies, TV series and their reviews from TMDB and load them
+into Postgres.
 
 Usage:
-    python data/ingest_tmdb.py --pages 5      # small test, ~100 films
-    python data/ingest_tmdb.py --pages 150    # full run, ~3000 films
+    python data/ingest_tmdb.py                        # MOVIE_PAGES and TV_PAGES from config
+    python data/ingest_tmdb.py --pages 5              # small test, ~100 of each
+    python data/ingest_tmdb.py --pages 5 --type tv    # TV series only
+    python data/ingest_tmdb.py --reset                # empty the title data first
 
-Safe to run more than once. Existing films are skipped, not duplicated.
+Safe to run more than once. Existing titles are skipped, not duplicated.
+Safe to stop with Ctrl+C: each title is saved together with its chunks,
+so running again carries on where it stopped.
 """
 import argparse
 import sys
@@ -19,7 +24,7 @@ from sentence_transformers import SentenceTransformer
 
 sys.path.insert(0, ".")
 from shared.config import (
-    DATABASE_URL, TMDB_API_KEY, TMDB_BASE, TMDB_DELAY,
+    DATABASE_URL, TMDB_API_KEY, TMDB_BASE, TMDB_DELAY, MOVIE_PAGES, TV_PAGES,
     EMBEDDING_MODEL, MAX_REVIEWS_PER_MOVIE, CHUNK_SIZE, CHUNK_OVERLAP,
 )
 
@@ -27,25 +32,66 @@ from shared.config import (
 # ==================================================================
 # TMDB requests
 # ==================================================================
+RETRIES = 4
+MAX_TMDB_PAGES = 500          # TMDB refuses any page above this
+
+
 def tmdb_get(path, **params):
-    """One GET against TMDB, with the key attached and a polite pause."""
+    """
+    One GET against TMDB, with the key attached and a polite pause.
+
+    Rate limits, server errors and timeouts are retried with a growing
+    wait. Over a run of thousands of requests a few always fail once.
+    """
     params["api_key"] = TMDB_API_KEY
-    response = requests.get(f"{TMDB_BASE}{path}", params=params, timeout=20)
-    response.raise_for_status()
-    time.sleep(TMDB_DELAY)
-    return response.json()
+
+    for attempt in range(1, RETRIES + 1):
+        try:
+            response = requests.get(
+                f"{TMDB_BASE}{path}", params=params, timeout=20
+            )
+            if response.status_code == 429 or response.status_code >= 500:
+                wait = int(response.headers.get("Retry-After", 0)) or 2 ** attempt
+                raise requests.HTTPError(
+                    f"{response.status_code}, retrying in {wait}s",
+                    response=response,
+                )
+            response.raise_for_status()
+            time.sleep(TMDB_DELAY)
+            return response.json()
+
+        except (requests.ConnectionError, requests.Timeout,
+                requests.HTTPError) as e:
+            status = getattr(e.response, "status_code", None)
+            retryable = status is None or status == 429 or status >= 500
+            if not retryable or attempt == RETRIES:
+                raise
+            time.sleep(2 ** attempt)
 
 
-def discover_movie_ids(pages):
-    """Collect movie ids, most popular first. 20 per page."""
+# TV genres that are not stories people ask to be recommended:
+# News, Soap and Talk. They dominate TMDB's popularity list otherwise.
+TV_EXCLUDED_GENRES = "10763|10766|10767"
+
+
+def discover_ids(media, pages):
+    """Collect movie or tv ids, most popular first. 20 per page."""
+    extra = {"without_genres": TV_EXCLUDED_GENRES} if media == "tv" else {}
+
+    if pages > MAX_TMDB_PAGES:
+        print(f"  TMDB serves at most {MAX_TMDB_PAGES} pages, "
+              f"so {pages} becomes {MAX_TMDB_PAGES}")
+        pages = MAX_TMDB_PAGES
+
     ids = []
     for page in range(1, pages + 1):
         try:
             data = tmdb_get(
-                "/discover/movie",
+                f"/discover/{media}",
                 sort_by="popularity.desc",
                 include_adult="false",
                 page=page,
+                **extra,
             )
         except requests.RequestException as e:
             print(f"  page {page} failed: {e}")
@@ -58,25 +104,96 @@ def discover_movie_ids(pages):
     return list(dict.fromkeys(ids))          # de-duplicate, keep order
 
 
-def movie_details(tmdb_id):
-    """Everything about one film in a single request."""
-    return tmdb_get(
-        f"/movie/{tmdb_id}",
-        append_to_response="credits,keywords,release_dates,reviews",
-    )
+def details(media, tmdb_id):
+    """Everything about one film or series in a single request."""
+    ratings = "content_ratings" if media == "tv" else "release_dates"
+    return _strip_nul(tmdb_get(
+        f"/{media}/{tmdb_id}",
+        append_to_response=f"credits,keywords,{ratings},reviews",
+    ))
+
+
+def _strip_nul(value):
+    """
+    Postgres rejects the NUL character in text, and a few TMDB reviews
+    contain one. Remove it everywhere before anything is saved.
+    """
+    if isinstance(value, str):
+        return value.replace("\x00", "")
+    if isinstance(value, list):
+        return [_strip_nul(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _strip_nul(v) for k, v in value.items()}
+    return value
 
 
 # ==================================================================
 # Pulling fields out of the TMDB response
+#
+# TMDB describes films and series with different field names. These
+# helpers read either, so the rest of the script treats them the same.
 # ==================================================================
+def get_title(data):
+    return data.get("title") or data.get("name")
+
+
+def get_release(data):
+    """Release date for a film, first air date for a series."""
+    return data.get("release_date") or data.get("first_air_date") or None
+
+
+def get_runtime(data):
+    """Film length, or typical episode length for a series."""
+    if data.get("runtime"):
+        return data["runtime"]
+
+    # episode_run_time is often empty for series, so fall back to the
+    # most recent episode
+    episode_times = data.get("episode_run_time") or []
+    if episode_times:
+        return episode_times[0]
+    return (data.get("last_episode_to_air") or {}).get("runtime")
+
+
+# The planner and the genre filter use film genre names. TMDB merges
+# some TV genres, so split those into the film names.
+TV_GENRE_MAP = {
+    "Action & Adventure": ["Action", "Adventure"],
+    "Sci-Fi & Fantasy": ["Science Fiction", "Fantasy"],
+    "War & Politics": ["War", "Politics"],
+}
+
+
+def get_genres(data):
+    genres = []
+    for g in data.get("genres", []):
+        for name in TV_GENRE_MAP.get(g["name"], [g["name"]]):
+            if name not in genres:
+                genres.append(name)
+    return genres
+
+
+def get_keywords(data):
+    """Films list keywords under 'keywords', series under 'results'."""
+    block = data.get("keywords", {})
+    return [k["name"] for k in block.get("keywords") or block.get("results") or []]
+
+
 def get_age_rating(data):
-    """US certification such as PG-13. Returns NR when absent."""
+    """US certification such as PG-13 or TV-14. Returns NR when absent."""
     for entry in data.get("release_dates", {}).get("results", []):
         if entry.get("iso_3166_1") == "US":
             for release in entry.get("release_dates", []):
                 cert = (release.get("certification") or "").strip()
                 if cert:
                     return cert
+
+    for entry in data.get("content_ratings", {}).get("results", []):
+        if entry.get("iso_3166_1") == "US":
+            cert = (entry.get("rating") or "").strip()
+            if cert:
+                return cert
+
     return "NR"
 
 
@@ -87,40 +204,60 @@ def get_director(data):
     return None
 
 
+def get_creator(data):
+    """Series only. Several creators are joined with commas."""
+    names = [p.get("name") for p in data.get("created_by") or [] if p.get("name")]
+    return ", ".join(names) or None
+
+
 def get_country(data):
+    # Series carry a plain list of codes, which is more reliable for TV
+    origin = data.get("origin_country") or []
+    if origin:
+        return origin[0]
+
     countries = data.get("production_countries") or []
     return countries[0].get("iso_3166_1") if countries else None
+
+
+def get_network(data):
+    networks = data.get("networks") or []
+    return networks[0].get("name") if networks else None
 
 
 # ==================================================================
 # Writing to the database
 # ==================================================================
-def insert_movie(cur, data):
-    """Insert one film. Returns its id, or None if it already existed."""
-    release = data.get("release_date") or None
+def insert_movie(cur, data, media="movie"):
+    """Insert one film or series. Returns its id, or None if it already existed."""
+    release = get_release(data)
     year = int(release[:4]) if release else None
+    is_tv = media == "tv"
 
     cur.execute(
         """
         INSERT INTO movies (
-            tmdb_id, title, original_title, year, release_date, runtime,
-            genres, age_rating, country, language, popularity,
+            media_type, tmdb_id, title, original_title, year, release_date,
+            runtime, genres, age_rating, country, language, popularity,
             vote_average, vote_count, overview, tagline, keywords,
-            cast_names, director, poster_path
+            cast_names, director, poster_path,
+            creator, seasons, episodes, status, network
         ) VALUES (
-            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+            %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+            %s,%s,%s,%s,%s
         )
-        ON CONFLICT (tmdb_id) DO NOTHING
+        ON CONFLICT (media_type, tmdb_id) DO NOTHING
         RETURNING id
         """,
         (
+            media,
             data["id"],
-            data.get("title"),
-            data.get("original_title"),
+            get_title(data),
+            data.get("original_title") or data.get("original_name"),
             year,
             release,
-            data.get("runtime"),
-            [g["name"] for g in data.get("genres", [])],
+            get_runtime(data),
+            get_genres(data),
             get_age_rating(data),
             get_country(data),
             data.get("original_language"),
@@ -129,10 +266,15 @@ def insert_movie(cur, data):
             data.get("vote_count"),
             data.get("overview"),
             data.get("tagline"),
-            [k["name"] for k in data.get("keywords", {}).get("keywords", [])],
+            get_keywords(data),
             [c["name"] for c in data.get("credits", {}).get("cast", [])[:10]],
             get_director(data),
             data.get("poster_path"),
+            get_creator(data) if is_tv else None,
+            data.get("number_of_seasons") if is_tv else None,
+            data.get("number_of_episodes") if is_tv else None,
+            data.get("status") if is_tv else None,
+            get_network(data) if is_tv else None,
         ),
     )
     row = cur.fetchone()
@@ -181,26 +323,33 @@ def split_long_text(text):
     return pieces
 
 
-def build_chunks(data, review_texts):
+def build_chunks(data, review_texts, media="movie"):
     """
-    One film becomes several chunks:
+    One film or series becomes several chunks:
       overview  - the plot description
-      metadata  - title, genres, keywords, cast, director
+      metadata  - type, title, genres, keywords, cast, director or creator
       review    - one or more per review
     """
     chunks = []
+    title = get_title(data) or ""
 
     overview = data.get("overview") or ""
     if overview:
-        parts = [data.get("title") or "", data.get("tagline") or "", overview]
+        parts = [title, data.get("tagline") or "", overview]
         chunks.append(("overview", " ".join(p for p in parts if p)))
 
+    # The type words let keyword and vector search match "a tv show"
+    # or "a series" against the right titles
+    kind = "TV series show" if media == "tv" else "film movie"
     meta_parts = [
-        data.get("title") or "",
-        " ".join(g["name"] for g in data.get("genres", [])),
-        " ".join(k["name"] for k in data.get("keywords", {}).get("keywords", [])),
+        kind,
+        title,
+        " ".join(get_genres(data)),
+        " ".join(get_keywords(data)),
         " ".join(c["name"] for c in data.get("credits", {}).get("cast", [])[:6]),
         get_director(data) or "",
+        get_creator(data) or "",
+        get_network(data) or "",
     ]
     metadata = " ".join(p for p in meta_parts if p).strip()
     if metadata:
@@ -214,9 +363,60 @@ def build_chunks(data, review_texts):
 
 
 # ==================================================================
+# Saving chunks
+# ==================================================================
+def save_chunks(cur, embedder, pending):
+    """Embed the queued chunks and insert them. Empties the queue."""
+    if not pending:
+        return
+
+    vectors = embedder.encode(
+        [c[2] for c in pending],
+        batch_size=32,
+        normalize_embeddings=True,
+        show_progress_bar=False,
+    )
+
+    for (movie_id, chunk_type, content), vector in zip(pending, vectors):
+        cur.execute(
+            "INSERT INTO chunks (movie_id, chunk_type, content, embedding) "
+            "VALUES (%s,%s,%s,%s)",
+            (movie_id, chunk_type, content, np.asarray(vector)),
+        )
+
+    pending.clear()
+
+
+def reset(cur):
+    """Remove every title, review and chunk. Accounts and logs are kept."""
+    cur.execute("TRUNCATE movies, reviews, chunks RESTART IDENTITY")
+    print("Emptied movies, reviews and chunks. Users and logs kept.\n")
+
+
+def remove_orphans(cur):
+    """
+    Delete titles that have no chunks.
+
+    Every title gets at least a metadata chunk, so a title without any
+    was left behind by an older, interrupted run. Search can never find
+    it, and it would be skipped as "already present" forever.
+    """
+    cur.execute(
+        "DELETE FROM movies m "
+        "WHERE NOT EXISTS (SELECT 1 FROM chunks c WHERE c.movie_id = m.id)"
+    )
+    if cur.rowcount:
+        print(f"Removed {cur.rowcount} titles left without chunks by an "
+              f"interrupted run. They will be fetched again.\n")
+
+
+# ==================================================================
 # Main
 # ==================================================================
-def main(pages, batch_size):
+COMMIT_EVERY = 25              # titles per save
+
+
+def main(pages, media_types, clear=False):
     if not TMDB_API_KEY:
         sys.exit("TMDB_API_KEY is missing from .env")
     if not DATABASE_URL:
@@ -225,10 +425,6 @@ def main(pages, batch_size):
     print("Loading the embedding model...")
     embedder = SentenceTransformer(EMBEDDING_MODEL)
 
-    print(f"Discovering films across {pages} pages...")
-    movie_ids = discover_movie_ids(pages)
-    print(f"Found {len(movie_ids)} unique films\n")
-
     pending = []                 # (movie_id, chunk_type, content)
     added = skipped = failed = 0
 
@@ -236,80 +432,108 @@ def main(pages, batch_size):
         register_vector(conn)    # lets psycopg send numpy arrays as vectors
 
         with conn.cursor() as cur:
-            for n, tmdb_id in enumerate(movie_ids, 1):
-                try:
-                    data = movie_details(tmdb_id)
-                except requests.RequestException as e:
-                    print(f"  [{n}] film {tmdb_id} failed: {e}")
-                    failed += 1
-                    continue
-
-                movie_id = insert_movie(cur, data)
-                if movie_id is None:
-                    skipped += 1
-                    continue
-
-                review_texts = insert_reviews(cur, movie_id, data)
-                for chunk_type, content in build_chunks(data, review_texts):
-                    pending.append((movie_id, chunk_type, content))
-
-                added += 1
-
-                if n % 25 == 0:
-                    conn.commit()
-                    print(f"  [{n}/{len(movie_ids)}] added {added}, "
-                          f"skipped {skipped}, failed {failed}, "
-                          f"chunks queued {len(pending)}")
-
+            if clear:
+                reset(cur)
+            remove_orphans(cur)
             conn.commit()
-            print(f"\nFilms added: {added}   already present: {skipped}   "
-                  f"failed: {failed}")
 
-            if not pending:
-                print("No new chunks to embed.")
-                return
+            for media in media_types:
+                label = "series" if media == "tv" else "films"
+                n_pages = pages or (TV_PAGES if media == "tv" else MOVIE_PAGES)
 
-            print(f"\nEmbedding {len(pending)} chunks...")
-            for start in range(0, len(pending), batch_size):
-                batch = pending[start:start + batch_size]
+                print(f"Discovering {label} across {n_pages} pages...")
+                tmdb_ids = discover_ids(media, n_pages)
+                print(f"Found {len(tmdb_ids)} unique {label}\n")
 
-                vectors = embedder.encode(
-                    [c[2] for c in batch],
-                    batch_size=32,
-                    normalize_embeddings=True,
-                    show_progress_bar=False,
+                # Skip titles already saved without downloading them again,
+                # so a resumed run gets back to new titles quickly
+                cur.execute(
+                    "SELECT tmdb_id FROM movies WHERE media_type = %s", (media,)
                 )
+                have = {r[0] for r in cur.fetchall()}
+                if have:
+                    print(f"  {len(have & set(tmdb_ids))} of these are "
+                          f"already saved and will be skipped")
 
-                for (movie_id, chunk_type, content), vector in zip(batch, vectors):
-                    cur.execute(
-                        "INSERT INTO chunks (movie_id, chunk_type, content, embedding) "
-                        "VALUES (%s,%s,%s,%s)",
-                        (movie_id, chunk_type, content, np.asarray(vector)),
-                    )
+                for n, tmdb_id in enumerate(tmdb_ids, 1):
+                    if tmdb_id in have:
+                        skipped += 1
+                        continue
 
+                    try:
+                        data = details(media, tmdb_id)
+                    except requests.RequestException as e:
+                        print(f"  [{n}] {media} {tmdb_id} failed: {e}")
+                        failed += 1
+                        continue
+
+                    # A savepoint, so one bad title is skipped instead of
+                    # breaking every title after it. Plain SQL on purpose:
+                    # conn.transaction() would commit each title on its
+                    # own, before its chunks exist.
+                    cur.execute("SAVEPOINT title")
+                    try:
+                        movie_id = insert_movie(cur, data, media)
+                        review_texts = (insert_reviews(cur, movie_id, data)
+                                        if movie_id else [])
+                        cur.execute("RELEASE SAVEPOINT title")
+                    except psycopg.Error as e:
+                        cur.execute("ROLLBACK TO SAVEPOINT title")
+                        print(f"  [{n}] {media} {tmdb_id} not saved: {e}")
+                        failed += 1
+                        continue
+
+                    if movie_id is None:
+                        skipped += 1
+                        continue
+
+                    for chunk_type, content in build_chunks(
+                        data, review_texts, media
+                    ):
+                        pending.append((movie_id, chunk_type, content))
+
+                    added += 1
+
+                    # Titles and their chunks are committed together, so
+                    # stopping the run never leaves a title unsearchable
+                    if n % COMMIT_EVERY == 0:
+                        save_chunks(cur, embedder, pending)
+                        conn.commit()
+                        print(f"  [{n}/{len(tmdb_ids)}] added {added}, "
+                              f"skipped {skipped}, failed {failed}")
+
+                save_chunks(cur, embedder, pending)
                 conn.commit()
-                done = min(start + batch_size, len(pending))
-                print(f"  embedded {done}/{len(pending)}")
 
-            cur.execute("SELECT count(*) FROM movies")
+            cur.execute("SELECT count(*) FROM movies WHERE media_type = 'movie'")
             n_movies = cur.fetchone()[0]
+            cur.execute("SELECT count(*) FROM movies WHERE media_type = 'tv'")
+            n_series = cur.fetchone()[0]
             cur.execute("SELECT count(*) FROM chunks")
             n_chunks = cur.fetchone()[0]
             cur.execute("SELECT count(*) FROM reviews")
             n_reviews = cur.fetchone()[0]
 
+    print(f"\nTitles added: {added}   already present: {skipped}   "
+          f"failed: {failed}")
     print(f"\nDone.")
     print(f"  films   : {n_movies}")
+    print(f"  series  : {n_series}")
     print(f"  reviews : {n_reviews}")
     print(f"  chunks  : {n_chunks}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pages", type=int, default=5,
-                        help="TMDB pages to fetch, 20 films per page")
-    parser.add_argument("--batch", type=int, default=256,
-                        help="chunks embedded per database batch")
+    parser.add_argument("--pages", type=int, default=None,
+                        help="TMDB pages to fetch per type, 20 titles per page. "
+                             "Default: MOVIE_PAGES and TV_PAGES in config")
+    parser.add_argument("--type", choices=["movie", "tv", "both"],
+                        default="both", help="what to ingest")
+    parser.add_argument("--reset", action="store_true",
+                        help="delete all titles, reviews and chunks first "
+                             "(accounts and logs are kept)")
     args = parser.parse_args()
 
-    main(args.pages, args.batch)
+    types = ["movie", "tv"] if args.type == "both" else [args.type]
+    main(args.pages, types, clear=args.reset)

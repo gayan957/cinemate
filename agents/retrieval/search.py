@@ -170,16 +170,33 @@ class Retriever:
     # ==============================================================
     # STEP 44 — Filtering, done in SQL
     # ==============================================================
+    # Every film and TV rating a user of each age limit may see. TV uses
+    # its own scale, so each TV rating sits with its nearest film rating.
+    ALLOWED_RATINGS = {
+        "G":     ["G", "TV-Y", "TV-Y7", "TV-G"],
+        "PG":    ["G", "PG", "TV-Y", "TV-Y7", "TV-G", "TV-PG"],
+        "PG-13": ["G", "PG", "PG-13", "TV-Y", "TV-Y7", "TV-G", "TV-PG",
+                  "TV-14"],
+        "R":     ["G", "PG", "PG-13", "R", "TV-Y", "TV-Y7", "TV-G",
+                  "TV-PG", "TV-14", "TV-MA"],
+    }
+
     def apply_filters(self, ranked, filters):
         """
-        Runtime, year, genre and age rating are structured fields,
+        Type, runtime, year, genre and age rating are structured fields,
         so they belong in a WHERE clause, not in the search text.
+
+        For a series, runtime is the episode length.
         """
         if not ranked or not filters:
             return ranked
 
         ids = [m for m, _ in ranked]
         clauses, params = ["id = ANY(%s)"], [ids]
+
+        if filters.get("media_type") in ("movie", "tv"):
+            clauses.append("media_type = %s")
+            params.append(filters["media_type"])
 
         if filters.get("max_runtime"):
             clauses.append("runtime > 0 AND runtime <= %s")
@@ -194,14 +211,10 @@ class Retriever:
             params.append(filters["genres"])
 
         if filters.get("max_age_rating"):
-            allowed = {
-                "G":     ["G"],
-                "PG":    ["G", "PG"],
-                "PG-13": ["G", "PG", "PG-13"],
-                "R":     ["G", "PG", "PG-13", "R"],
-            }
             clauses.append("age_rating = ANY(%s)")
-            params.append(allowed.get(filters["max_age_rating"], ["G"]))
+            params.append(self.ALLOWED_RATINGS.get(
+                filters["max_age_rating"], self.ALLOWED_RATINGS["G"]
+            ))
 
         with self.conn.cursor() as cur:
             cur.execute(
@@ -345,8 +358,9 @@ class Retriever:
         with self.conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, tmdb_id, title, year, runtime, genres,
-                       age_rating, country, director, overview
+                SELECT id, media_type, tmdb_id, title, year, runtime, genres,
+                       age_rating, country, director, overview,
+                       creator, seasons, episodes, status, network
                 FROM movies WHERE id = ANY(%s)
                 """,
                 (ids,),

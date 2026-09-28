@@ -43,6 +43,7 @@ class UserQuery(BaseModel):
 # ==================================================================
 
 class SearchFilters(BaseModel):
+    media_type: Optional[str] = None   # movie | tv | None for both
     genres: List[str] = []
     max_runtime: Optional[int] = None
     min_year: Optional[int] = None
@@ -68,8 +69,12 @@ class QueryPlan(BaseModel):
 # ==================================================================
 
 class RetrievedMovie(BaseModel):
-    """One film returned by search. Scores are per film, not per chunk."""
+    """
+    One film or TV series returned by search. Scores are per title,
+    not per chunk. For a series, runtime is the episode length.
+    """
     doc_id: str
+    media_type: str = "movie"          # movie | tv
     tmdb_id: Optional[int] = None
     title: str
     year: int
@@ -78,6 +83,11 @@ class RetrievedMovie(BaseModel):
     age_rating: str = "NR"
     country: Optional[str] = None      # needed for the fairness audit
     director: Optional[str] = None
+    creator: Optional[str] = None      # TV only
+    seasons: Optional[int] = None      # TV only
+    episodes: Optional[int] = None     # TV only
+    status: Optional[str] = None       # TV only
+    network: Optional[str] = None      # TV only
     overview: str = ""
     score: float
     matched_text: str = ""
@@ -122,6 +132,7 @@ class Recommendation(BaseModel):
     doc_id: str                        # traces back to a real document
     title: str
     year: int
+    media_type: str = "movie"          # movie | tv
     reason: str
     sentiment: str = "unavailable"
     retrieval_score: float = 0.0

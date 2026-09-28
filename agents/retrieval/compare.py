@@ -15,6 +15,7 @@ QUERIES = [
     "heist movie with a clever twist",         # mixed
     "animated film for young children",        # genre-like
     "war drama based on true events",          # mixed
+    "tv series about a chemistry teacher",     # series - type words in metadata
 ]
 
 METHODS = ["bm25", "fulltext", "dense", "hybrid", "reranked"]
