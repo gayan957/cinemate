@@ -131,6 +131,19 @@ if result:
 
         st.markdown(result["answer"])
 
+        # ---- Posters for the titles named in the answer ----
+        posters = result.get("posters", [])
+        if posters:
+            cols = st.columns(max(len(posters), 3))
+            for col, poster in zip(cols, posters):
+                caption = f"{poster['title']} ({poster['year']})"
+                if poster.get("poster_url"):
+                    col.image(poster["poster_url"], caption=caption,
+                              width="stretch")
+                else:
+                    col.markdown(f"**{caption}**")
+                    col.caption("No poster available")
+
         with st.expander("How this answer was produced"):
             st.write("**Agents used:** " + ", ".join(result["agents_used"]))
             st.write("**Trace ID:** " + str(result.get("trace_id")))

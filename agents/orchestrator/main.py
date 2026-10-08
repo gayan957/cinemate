@@ -5,6 +5,7 @@ Start with:
     uvicorn agents.orchestrator.main:app --port 8000
 """
 import os
+import re
 import sys
 
 import requests
@@ -14,7 +15,7 @@ from groq import Groq
 sys.path.insert(0, ".")
 from shared.config import (
     GROQ_API_KEY, LLM_MODEL, LLM_TIMEOUT,
-    ANALYSIS_URL, ANALYSIS_TIMEOUT,
+    ANALYSIS_URL, ANALYSIS_TIMEOUT, TMDB_POSTER_BASE,
 )
 from shared.schemas import UserQuery
 from agents.orchestrator.planner import make_plan
@@ -117,6 +118,7 @@ async def process(request: UserQuery):
     return {
         "answer": answer,
         "recommendations": recommendations,
+        "posters": _posters(answer, films[:5]),
         "needs_clarification": False,
         "question": None,
         "options": [],
@@ -217,10 +219,42 @@ def _write_answer(query, films, analyses):
         )
 
 
+def _posters(answer, films):
+    """
+    The titles the answer names, in the order it names them.
+
+    The model picks its favourites from the five it was given, so the
+    posters follow the answer, not the search ranking. If it names none
+    (for example the fallback answer), show the top three instead.
+    """
+    found = []
+    for f in films:
+        # Title followed by its year, e.g. "Up (2009)" or "**Up** (2009)",
+        # so a title that is a common word does not match ordinary text.
+        pattern = rf"\b{re.escape(f['title'])}\W{{0,4}}{f['year']}\b"
+        match = re.search(pattern, answer, re.IGNORECASE)
+        if match:
+            found.append((match.start(), f))
+
+    named = [f for _, f in sorted(found, key=lambda pair: pair[0])] or films[:3]
+
+    return [
+        {
+            "doc_id": f["doc_id"],
+            "title": f["title"],
+            "year": f["year"],
+            "poster_url": (f"{TMDB_POSTER_BASE}{f['poster_path']}"
+                           if f.get("poster_path") else None),
+        }
+        for f in named
+    ]
+
+
 def _error_response(message, agents_used):
     return {
         "answer": message,
         "recommendations": [],
+        "posters": [],
         "needs_clarification": False,
         "question": None,
         "options": [],

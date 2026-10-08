@@ -360,7 +360,8 @@ class Retriever:
                 """
                 SELECT id, media_type, tmdb_id, title, year, runtime, genres,
                        age_rating, country, director, overview,
-                       creator, seasons, episodes, status, network
+                       creator, seasons, episodes, status, network,
+                       poster_path
                 FROM movies WHERE id = ANY(%s)
                 """,
                 (ids,),

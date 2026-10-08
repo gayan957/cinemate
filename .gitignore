@@ -3,7 +3,9 @@
 *.key
 
 # Virtual environment - large and rebuildable
+.venv
 .venv/
+.venv.nosync/
 venv/
 
 # Python generated files

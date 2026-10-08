@@ -59,6 +59,7 @@ DEFAULT_METHOD = "full"
 # Ingestion
 # ------------------------------------------------------------------
 TMDB_BASE = "https://api.themoviedb.org/3"
+TMDB_POSTER_BASE = "https://image.tmdb.org/t/p/w342"   # + poster_path
 TMDB_DELAY = 0.25                      # seconds between requests
 MOVIE_PAGES = 300                      # 20 per page -> 6,000 films
 TV_PAGES = 200                         # 20 per page -> 4,000 series

@@ -29,10 +29,13 @@ SERVICES = [
 processes = []
 
 
-def wait_for(port, name, timeout=90):
+def wait_for(process, port, name, timeout=90):
     """The Analysis agent loads models, so give it time."""
     start = time.time()
     while time.time() - start < timeout:
+        if process.poll() is not None:
+            print(f"  {name} crashed (exit code {process.returncode})")
+            return False
         try:
             r = requests.get(f"http://127.0.0.1:{port}/health", timeout=2)
             if r.status_code == 200:
@@ -49,8 +52,10 @@ def wait_for(port, name, timeout=90):
 try:
     for name, port, command in SERVICES:
         print(f"Starting {name}...")
-        processes.append(subprocess.Popen(command))
-        wait_for(port, name)
+        process = subprocess.Popen(command)
+        processes.append(process)
+        if not wait_for(process, port, name):
+            raise SystemExit(f"{name.strip()} failed to start, see the error above")
 
     print("\nStarting the interface...")
     processes.append(
@@ -67,7 +72,9 @@ try:
     for p in processes:
         p.wait()
 
-except KeyboardInterrupt:
+except (KeyboardInterrupt, SystemExit) as e:
+    if isinstance(e, SystemExit):
+        print(f"\n{e}")
     print("\nStopping...")
     for p in processes:
         p.terminate()

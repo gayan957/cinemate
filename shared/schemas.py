@@ -89,6 +89,7 @@ class RetrievedMovie(BaseModel):
     status: Optional[str] = None       # TV only
     network: Optional[str] = None      # TV only
     overview: str = ""
+    poster_path: Optional[str] = None  # TMDB image path, e.g. /abc.jpg
     score: float
     matched_text: str = ""
 
@@ -138,6 +139,14 @@ class Recommendation(BaseModel):
     retrieval_score: float = 0.0
 
 
+class Poster(BaseModel):
+    """A title named in the answer, with its TMDB poster if it has one."""
+    doc_id: str
+    title: str
+    year: int
+    poster_url: Optional[str] = None   # None when TMDB has no poster
+
+
 class FinalResponse(BaseModel):
     """
     What the user receives.
@@ -147,6 +156,7 @@ class FinalResponse(BaseModel):
     """
     answer: str = ""
     recommendations: List[Recommendation] = []
+    posters: List[Poster] = []         # titles in the answer, in its order
     needs_clarification: bool = False
     question: Optional[str] = None
     options: List[str] = []
