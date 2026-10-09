@@ -46,3 +46,4 @@ button[kind="secondary"]:hover { border-color:#ce6269 !important; color:#fff !im
 .cm-badge { display:inline-flex; padding:5px 11px; border:1px solid #353d4b; border-radius:999px; color:#c9d1dc; font-size:.78rem; margin:.5rem .3rem .35rem 0; }
 [data-testid="stExpander"] { border-color:#303846 !important; background:#0d121b; border-radius:12px; }
 [data-testid="stImage"] img { object-fit:cover; }
+@media(max-width:800px) { .block-container{padding:1rem .9rem !important;} .cm-hero { min-height:260px; padding:2.8rem 1.3rem 1.7rem; } .cm-hero h1{font-size:2.25rem;} .cm-auth-info{min-height:250px; padding:1.7rem 1.25rem;} .cm-auth-info h1{font-size:2.15rem;} .cm-section-label{font-size:1.28rem;} }
