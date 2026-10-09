@@ -35,3 +35,10 @@ button[kind="primary"]:hover { background:#ea424d !important; border-color:#ea42
 button[kind="secondary"], button[kind="tertiary"] { background:#111821 !important; color:#e9edf4 !important; border:1px solid #303b49 !important; border-radius:12px !important; }
 button[kind="secondary"]:hover { border-color:#ce6269 !important; color:#fff !important; }
 .st-key-example_buttons [data-testid="stHorizontalBlock"] button { min-height:39px; font-size:.83rem; }
+.st-key-recommendation_1, .st-key-recommendation_2, .st-key-recommendation_3 { padding:.8rem !important; border-radius:15px !important; background:#10161f !important; border:1px solid #2a3039 !important; min-height: 300px; }
+.st-key-recommendation_1 [data-testid="stImage"], .st-key-recommendation_2 [data-testid="stImage"], .st-key-recommendation_3 [data-testid="stImage"] { border-radius:9px; overflow:hidden; }
+.cm-section-label { font-size:1.5rem; font-weight:780; letter-spacing:-.035em; margin:1.4rem 0 .7rem; }
+.cm-type { border:1px solid #3a4351; border-radius:99px; padding:3px 9px; font-size:.69rem; color:#c1c9d3; }
+.cm-card-title { font-size:1.09rem; font-weight:750; margin:.1rem 0 .3rem; }
+.cm-card-meta { font-size:.8rem; color:#b7bfcd; margin:.2rem 0 .5rem; }
+.cm-poster-fallback { background:linear-gradient(135deg,#152032,#0b0d13); min-height:175px; display:grid; place-items:center; color:#9caac0; border-radius:10px; text-align:center; }
