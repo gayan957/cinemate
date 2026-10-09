@@ -42,3 +42,7 @@ button[kind="secondary"]:hover { border-color:#ce6269 !important; color:#fff !im
 .cm-card-title { font-size:1.09rem; font-weight:750; margin:.1rem 0 .3rem; }
 .cm-card-meta { font-size:.8rem; color:#b7bfcd; margin:.2rem 0 .5rem; }
 .cm-poster-fallback { background:linear-gradient(135deg,#152032,#0b0d13); min-height:175px; display:grid; place-items:center; color:#9caac0; border-radius:10px; text-align:center; }
+.cm-bottom { color:#7f8998; font-size:.78rem; padding-top:1rem; border-top:1px solid #252b34; margin-top:1.5rem; }
+.cm-badge { display:inline-flex; padding:5px 11px; border:1px solid #353d4b; border-radius:999px; color:#c9d1dc; font-size:.78rem; margin:.5rem .3rem .35rem 0; }
+[data-testid="stExpander"] { border-color:#303846 !important; background:#0d121b; border-radius:12px; }
+[data-testid="stImage"] img { object-fit:cover; }
