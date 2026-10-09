@@ -24,3 +24,14 @@ h1, h2, h3, p { letter-spacing: -.015em; }
 .cm-auth-features span { display:inline-block; padding:.6rem .7rem; border:1px solid #394050; background:rgba(6,10,17,.60); border-radius:20px; color:#e4e7eb; font-size:.82rem; }
 .st-key-auth_panel { background:rgba(13,18,27,.96); padding:1.25rem 1.35rem; border:1px solid #2a303c !important; border-radius:18px !important; }
 .st-key-auth_panel h3 { margin: .3rem 0; }
+.st-key-search_panel { padding: .25rem 0 .7rem; }
+.st-key-search_panel [data-testid="stForm"] { border:0 !important; padding:0 !important; }
+.st-key-search_panel [data-testid="stHorizontalBlock"] { align-items:center; }
+.stTextInput > div > div, .stTextArea textarea, .stNumberInput input { background:#121923 !important; color: #fff !important; border-color:#34404e !important; border-radius:13px !important; }
+.stTextInput input::placeholder, textarea::placeholder { color:#8995a6 !important; }
+.stTextInput input:focus, .stTextArea textarea:focus { border-color:var(--cm-accent) !important; box-shadow:none !important; }
+button[kind="primary"], [data-testid="stFormSubmitButton"] button[kind="primary"] { background:var(--cm-accent) !important; border:1px solid var(--cm-accent) !important; color:white !important; border-radius:12px !important; font-weight:700 !important; }
+button[kind="primary"]:hover { background:#ea424d !important; border-color:#ea424d !important; }
+button[kind="secondary"], button[kind="tertiary"] { background:#111821 !important; color:#e9edf4 !important; border:1px solid #303b49 !important; border-radius:12px !important; }
+button[kind="secondary"]:hover { border-color:#ce6269 !important; color:#fff !important; }
+.st-key-example_buttons [data-testid="stHorizontalBlock"] button { min-height:39px; font-size:.83rem; }
