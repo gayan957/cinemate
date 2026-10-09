@@ -26,3 +26,15 @@ def poster_for(recommendation: dict[str, Any], posters: list[dict[str, Any]]) ->
             continue
         return poster.get("poster_url") or None
     return None
+
+def api_error_message(status: int, detail: str = "") -> str:
+    """Translate backend status codes into concise, non-sensitive UI feedback."""
+    if status == 400:
+        return detail or "The request could not be processed. Try different wording."
+    if status == 401:
+        return "Your session has expired. Please log in again."
+    if status == 429:
+        return detail or "You've reached your daily question limit. Please try tomorrow."
+    if status == 503:
+        return "CineMate is taking longer than expected. Please try again shortly."
+    return detail if 400 <= status < 500 else "Something went wrong. Please try again."
