@@ -1,0 +1,9 @@
+/* CineMate visual refresh. Scoped selectors target Streamlit components. */
+:root { --cm-bg: #070a10; --cm-panel: #0d121b; --cm-stroke: #242d39; --cm-text: #f7f8fa; --cm-muted: #abb4c4; --cm-accent: #fa5962; }
+html, body, [data-testid="stApp"] { background: var(--cm-bg) !important; color: var(--cm-text); }
+[data-testid="stAppViewContainer"] { background: #070a10 !important; }
+[data-testid="stHeader"], [data-testid="stToolbar"] { background: transparent !important; }
+[data-testid="stSidebar"] { display: none; }
+.block-container { max-width: 1290px !important; padding-top: 1rem !important; padding-bottom: 2rem !important; }
+#MainMenu, footer { visibility: hidden; }
+h1, h2, h3, p { letter-spacing: -.015em; }
