@@ -149,31 +149,151 @@ def auth_screen() -> None:
                                 st.error(api_error_message(response.status_code, safe_details(response)))
 
 
+def hero(has_results: bool) -> None:
+    if has_results:
+        title = 'Here are your<br><span class="cm-accent">perfect picks.</span>'
+        subtitle = "Recommendations based on what you asked for."
+        css_class = "cm-hero cm-hero-results"
+    else:
+        title = 'Find your next<br><span class="cm-accent">movie or show</span> with AI.'
+        subtitle = "Describe your mood. We'll find something worth watching."
+        css_class = "cm-hero"
+    st.markdown(
+        f'<section class="{css_class}"><span class="cm-tag">AI MOVIE &amp; TV ASSISTANT</span><h1>{title}</h1><p>{subtitle}</p></section>',
+        unsafe_allow_html=True,
+    )
+
+
+def set_example(text: str) -> None:
+    st.session_state.query_text = text
+
+
+def request_recommendations(query: str) -> None:
+    with st.spinner("Finding your best matches…"):
+        response = post("/ask", {"query": query.strip()}, auth=True)
+    if response is None:
+        return
+    if response.status_code == 200:
+        st.session_state.result = response.json()
+        st.session_state.pending_query = query.strip()
+        st.rerun()
+    else:
+        if response.status_code == 401:
+            st.session_state.token = None
+            st.warning("Please sign in again.")
+            st.rerun()
+        else:
+            st.error(api_error_message(response.status_code, safe_details(response)))
+
+
+def search_area(has_results: bool) -> None:
+    with st.container(key="search_panel"):
+        with st.form("search_form", border=False):
+            input_col, submit_col = st.columns([5, 1], vertical_alignment="bottom")
+            with input_col:
+                query = st.text_input(
+                    "Describe what you feel like watching",
+                    placeholder="e.g. A funny TV series with short episodes",
+                    label_visibility="collapsed",
+                    key="query_text",
+                )
+            with submit_col:
+                submitted = st.form_submit_button("Find matches →", type="primary", use_container_width=True)
+        if submitted:
+            if query.strip():
+                request_recommendations(query)
+            else:
+                st.warning("Describe what you're in the mood for first.")
+        if not has_results:
+            with st.container(key="example_buttons"):
+                cols = st.columns(4)
+                for col, example in zip(cols, EXAMPLES):
+                    with col:
+                        st.button(example, key=f"example_{EXAMPLES.index(example)}", use_container_width=True,
+                                  on_click=set_example, args=(example,))
+
+
+def clarification(result: dict[str, Any]) -> None:
+    st.info(result.get("question") or "Can you tell me a little more?")
+    options = result.get("options") or []
+    if options:
+        for i, option in enumerate(options):
+            if st.button(str(option), key=f"clarify_{i}"):
+                combined = f"{st.session_state.pending_query}, {option}"
+                request_recommendations(combined)
+
+
+def recommendation_cards(result: dict[str, Any]) -> None:
+    recommendations = useful_recommendations(result)
+    if not recommendations:
+        st.info("No recommendation cards were returned for this request.")
+        return
+    st.markdown('<div class="cm-section-label">Your top recommendations</div>', unsafe_allow_html=True)
+    posters = result.get("posters") or []
+    cols = st.columns(min(len(recommendations), 3), gap="medium")
+    for number, recommendation in enumerate(recommendations[:3], start=1):
+        with cols[number - 1]:
+            with st.container(border=True, key=f"recommendation_{number}"):
+                poster_url = poster_for(recommendation, posters)
+                image_col, text_col = st.columns([1, 1.13], vertical_alignment="top", gap="small")
+                with image_col:
+                    if poster_url:
+                        st.image(poster_url, use_container_width=True)
+                    else:
+                        st.markdown('<div class="cm-poster-fallback">🎬<br>Poster unavailable</div>', unsafe_allow_html=True)
+                with text_col:
+                    st.markdown(f"**{number}. {recommendation['title']}**")
+                    meta_parts = [str(recommendation.get("year") or "") ,label_for_media(recommendation.get("media_type"))]
+                    st.caption(" · ".join(piece for piece in meta_parts if piece))
+                    sentiment = recommendation.get("sentiment")
+                    if sentiment and sentiment != "unavailable":
+                        st.caption(f"Review sentiment: {sentiment}")
+                with st.expander("Why this match?"):
+                    st.write(recommendation.get("reason") or "Selected from the movie database for your request.")
+                    score = recommendation.get("retrieval_score")
+                    if isinstance(score, (int, float)):
+                        st.caption(f"Retrieval score: {score:.3f} (not a viewer rating)")
+                    if recommendation.get("doc_id"):
+                        st.caption(f"Database evidence: {recommendation['doc_id']}")
+
+
+def results_section(result: dict[str, Any]) -> None:
+    if result.get("needs_clarification"):
+        clarification(result)
+        return
+    if result.get("relaxed_filters"):
+        st.warning("Some search filters were relaxed: " + ", ".join(map(str, result["relaxed_filters"])))
+    if result.get("notice"):
+        st.info(str(result["notice"]))
+    recommendation_cards(result)
+    if result.get("answer"):
+        with st.expander("Read CineMate's full explanation"):
+            st.markdown(result["answer"])
+    with st.expander("How your answer was produced"):
+        st.write("Agents used: " + ", ".join(map(str, result.get("agents_used") or [])))
+        st.caption("Trace ID: " + str(result.get("trace_id") or "Not available"))
+        st.caption("Recommendations are linked to retrieved database records. AI-generated explanations can be imperfect.")
+        recommendations = useful_recommendations(result)
+        if recommendations:
+            rows = [{**rec, "media_type": label_for_media(rec.get("media_type"))} for rec in recommendations]
+            st.dataframe(rows, use_container_width=True, hide_index=True)
+
+
 def main() -> None:
     apply_theme()
     if not st.session_state.token:
         auth_screen()
     else:
         top_bar(authenticated=True)
-        st.title("What do you feel like watching?")
-        query = st.text_input("Describe your movie or TV request", key="query_text")
-        if st.button("Find matches", type="primary") and query.strip():
-            with st.spinner("Searching for movie and TV recommendations..."):
-                response = post("/ask", {"query": query.strip()}, auth=True)
-            if response is not None and response.status_code == 200:
-                st.session_state.result = response.json()
-                st.session_state.pending_query = query.strip()
-            elif response is not None:
-                st.error(api_error_message(response.status_code, safe_details(response)))
+        has_results = st.session_state.result is not None
+        hero(has_results)
+        search_area(has_results)
         if st.session_state.result:
-            result = st.session_state.result
-            if result.get("needs_clarification"):
-                st.info(result.get("question", "Could you clarify your request?"))
-            else:
-                st.markdown(result.get("answer") or "No response available.")
-                for rec in useful_recommendations(result)[:3]:
-                    st.write(f"**{rec.get('title')}** — {label_for_media(rec.get('media_type'))}")
-    st.caption("CineMate uses TMDB data but is not endorsed or certified by TMDB.")
+            results_section(st.session_state.result)
+    st.markdown(
+        '<div class="cm-bottom">CineMate uses TMDB data but is not endorsed or certified by TMDB. It recommends titles; it does not stream them.</div>',
+        unsafe_allow_html=True,
+    )
 
 
 if __name__ == "__main__":
