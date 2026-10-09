@@ -2,7 +2,7 @@
 
 import unittest
 
-from frontend.ui_utils import api_error_message, label_for_media, poster_for, useful_recommendations
+from frontend.ui_utils import api_error_message, label_for_media, poster_for, safe_details, useful_recommendations
 
 
 class UiUtilsTests(unittest.TestCase):
@@ -28,6 +28,12 @@ class UiUtilsTests(unittest.TestCase):
 
     def test_timeout_error(self):
         self.assertIn("longer", api_error_message(503))
+
+    def test_safe_details_invalid_json(self):
+        class FakeResponse:
+            def json(self):
+                raise ValueError("not JSON")
+        self.assertEqual(safe_details(FakeResponse()), "")
 
 
 if __name__ == "__main__":
