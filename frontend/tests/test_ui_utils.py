@@ -2,7 +2,7 @@
 
 import unittest
 
-from frontend.ui_utils import label_for_media, poster_for, useful_recommendations
+from frontend.ui_utils import api_error_message, label_for_media, poster_for, useful_recommendations
 
 
 class UiUtilsTests(unittest.TestCase):
@@ -22,6 +22,12 @@ class UiUtilsTests(unittest.TestCase):
 
     def test_does_not_use_wrong_poster(self):
         self.assertIsNone(poster_for({"title": "Lost", "year": 2010}, [{"title": "Lost", "year": 2004, "poster_url": "url"}]))
+
+    def test_rate_limit_error(self):
+        self.assertIn("daily", api_error_message(429).lower())
+
+    def test_timeout_error(self):
+        self.assertIn("longer", api_error_message(503))
 
 
 if __name__ == "__main__":
