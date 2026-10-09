@@ -38,3 +38,11 @@ def api_error_message(status: int, detail: str = "") -> str:
     if status == 503:
         return "CineMate is taking longer than expected. Please try again shortly."
     return detail if 400 <= status < 500 else "Something went wrong. Please try again."
+
+def safe_details(response: Any) -> str:
+    """Read the Guardian's public error detail, if supplied as JSON."""
+    try:
+        value = response.json().get("detail", "")
+        return value if isinstance(value, str) else ""
+    except (ValueError, AttributeError, TypeError):
+        return ""
