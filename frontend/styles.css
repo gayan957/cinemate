@@ -7,3 +7,8 @@ html, body, [data-testid="stApp"] { background: var(--cm-bg) !important; color: 
 .block-container { max-width: 1290px !important; padding-top: 1rem !important; padding-bottom: 2rem !important; }
 #MainMenu, footer { visibility: hidden; }
 h1, h2, h3, p { letter-spacing: -.015em; }
+.cm-brand { display: flex; align-items: center; gap: .65rem; font-size: 1.45rem; font-weight: 800; letter-spacing:-.04em; padding-top: .25rem; }
+.cm-mark { display: inline-grid; place-items: center; background: var(--cm-accent); color:#090b10; width:37px; height:37px; border-radius:50%; font-size:1.38rem; line-height:1; }
+.cm-brand .cm-coral, .cm-accent { color:var(--cm-accent); }
+.cm-tag { letter-spacing: .21em; color:#b1bac8; text-transform:uppercase; font-size:.69rem; font-weight:700; }
+.cm-muted { color:var(--cm-muted); }
