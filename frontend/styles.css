@@ -12,3 +12,8 @@ h1, h2, h3, p { letter-spacing: -.015em; }
 .cm-brand .cm-coral, .cm-accent { color:var(--cm-accent); }
 .cm-tag { letter-spacing: .21em; color:#b1bac8; text-transform:uppercase; font-size:.69rem; font-weight:700; }
 .cm-muted { color:var(--cm-muted); }
+.cm-hero { min-height: 305px; margin: 1.6rem 0 1.1rem; padding: 4.7rem 3.1rem 2.65rem; display:flex; flex-direction:column; justify-content:flex-end; border-radius:18px; overflow:hidden; border:1px solid #1b222b; background-color:#0b0e15; background-image:linear-gradient(90deg,rgba(5,8,13,.99) 0%,rgba(5,8,13,.94) 26%,rgba(5,8,13,.61) 55%,rgba(5,8,13,.10) 100%), linear-gradient(0deg,rgba(6,9,15,.79),rgba(6,9,15,.03) 45%), var(--cinemate-hero); background-repeat:no-repeat; background-position:center; background-size:cover; }
+.cm-hero.cm-hero-results { min-height: 210px; padding-top:3rem; padding-bottom:2rem; }
+.cm-hero h1 { font-size:clamp(2.3rem,4.4vw,4.2rem); max-width:740px; font-weight:780; line-height:1.05; letter-spacing:-.06em; margin:.65rem 0 .8rem; }
+.cm-hero.cm-hero-results h1 { font-size:clamp(2.1rem,3.7vw,3.6rem); }
+.cm-hero p { color:#d5d8de; margin:0; font-size:clamp(.94rem,1.26vw,1.13rem); }
