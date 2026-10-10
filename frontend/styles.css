@@ -142,8 +142,8 @@ button[kind="primary"]:hover,
 .cm-film-meta span { border:1px solid #3a4451; background:rgba(32,39,51,.6); padding:.22rem .5rem; border-radius:999px; white-space:nowrap; }
 .cm-film-caption { color:#97a1af; font-size:.79rem; line-height:1.55; margin-top:1.2rem; }
 .st-key-cm_recommendation_explanation {
-  height:100%; padding:1.2rem 1.25rem!important; border:1px solid #343b47;
-  border-radius:14px; background:rgba(14,18,26,.94);
+  margin:1.15rem .4rem 0; padding:1.2rem 1.4rem!important;
+  border:1px solid #343b47; border-radius:14px; background:rgba(14,18,26,.94);
 }
 .cm-explanation-title {
   margin:.55rem 0 .9rem!important; color:#fbfbfc; font-size:1.2rem!important;
