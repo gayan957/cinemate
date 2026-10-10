@@ -20,7 +20,7 @@ if str(ROOT) not in sys.path:
 
 from shared.config import GUARDIAN_URL  # noqa: E402
 from frontend.ui_utils import (  # noqa: E402
-    api_error_message, label_for_media, media_card_html,
+    api_error_message, label_for_media, media_card_html, animated_headline_html,
     safe_details, useful_recommendations,
 )
 
@@ -117,7 +117,7 @@ def auth_screen() -> None:
         with left:
             st.markdown('''<section class="cm-intro cm-intro-auth">
               <span class="cm-eyebrow">CINEMATE &nbsp;/&nbsp; AI MOVIE ASSISTANT</span>
-              <h1 class="cm-animated-headline"><span class="cm-headline-line">Find your next</span><br><em class="cm-headline-line cm-headline-accent">great watch.</em></h1>
+              ''' + animated_headline_html() + '''
               <p>Tell us what you're in the mood for.<br>We'll find the movies and shows that fit.</p>
               <div class="cm-intro-rule"></div>
               <span class="cm-intro-footnote">ONE QUESTION. THREE THOUGHTFUL MATCHES.</span>

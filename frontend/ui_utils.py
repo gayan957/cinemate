@@ -9,6 +9,25 @@ from typing import Any
 from urllib.parse import urlparse
 
 
+def animated_headline_html() -> str:
+    """Keep one accessible heading while revealing its visible letters in order."""
+    lines = []
+    index = 0
+    for text, tag in (("Find your next", "span"), ("great watch.", "em")):
+        letters = []
+        for character in text:
+            content = "&nbsp;" if character == " " else html.escape(character)
+            letters.append(
+                f'<span class="cm-headline-letter" style="--cm-letter-index:{index}">{content}</span>'
+            )
+            index += 1
+        lines.append(f'<{tag} class="cm-headline-line" aria-hidden="true">{"".join(letters)}</{tag}>')
+    return (
+        '<h1 class="cm-animated-headline" aria-label="Find your next great watch.">'
+        + "<br>".join(lines) + "</h1>"
+    )
+
+
 def label_for_media(media_type: str | None) -> str:
     return "TV series" if media_type == "tv" else "Movie"
 
