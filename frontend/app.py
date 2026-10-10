@@ -117,7 +117,7 @@ def auth_screen() -> None:
         with left:
             st.markdown('''<section class="cm-intro cm-intro-auth">
               <span class="cm-eyebrow">CINEMATE &nbsp;/&nbsp; AI MOVIE ASSISTANT</span>
-              <h1>Find your next<br><em>great watch.</em></h1>
+              <h1 class="cm-animated-headline"><span class="cm-headline-line">Find your next</span><br><em class="cm-headline-line cm-headline-accent">great watch.</em></h1>
               <p>Tell us what you're in the mood for.<br>We'll find the movies and shows that fit.</p>
               <div class="cm-intro-rule"></div>
               <span class="cm-intro-footnote">ONE QUESTION. THREE THOUGHTFUL MATCHES.</span>

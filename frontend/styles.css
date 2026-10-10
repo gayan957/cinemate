@@ -53,6 +53,45 @@ h1,h2,h3,h4,p { font-family: 'Manrope','DM Sans',sans-serif !important; }
   max-width:840px;
 }
 .cm-intro h1 em { font-style:normal; color:var(--cm-coral); }
+/* Staggered headline reveal followed by a gentle coral highlight. */
+.cm-animated-headline .cm-headline-line {
+  display:inline-block;
+  animation:cm-headline-reveal .9s cubic-bezier(.16,1,.3,1) both;
+}
+.cm-animated-headline .cm-headline-accent {
+  animation-delay:.18s;
+}
+@supports (background-clip:text) or (-webkit-background-clip:text) {
+  .cm-animated-headline .cm-headline-accent {
+    background-image:linear-gradient(110deg,var(--cm-coral) 35%,#ffc0b5 50%,var(--cm-coral) 65%);
+    background-size:250% 100%;
+    background-position:100% 50%;
+    background-clip:text;
+    -webkit-background-clip:text;
+    color:transparent;
+    animation:cm-headline-reveal .9s cubic-bezier(.16,1,.3,1) .18s both,
+              cm-headline-shimmer 7s ease-in-out 1.2s infinite;
+  }
+}
+@keyframes cm-headline-reveal {
+  from { opacity:0; transform:translateY(24px); }
+  to { opacity:1; transform:translateY(0); }
+}
+@keyframes cm-headline-shimmer {
+  0%,65% { background-position:100% 50%; }
+  90%,100% { background-position:0% 50%; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .cm-animated-headline .cm-headline-line {
+    animation:none;
+    transform:none;
+    opacity:1;
+  }
+  .cm-animated-headline .cm-headline-accent {
+    background-image:none;
+    color:var(--cm-coral);
+  }
+}
 .cm-intro p { font-size:1.10rem; line-height:1.65; color:#c6c8d0; margin:0; font-weight:450; }
 .cm-landing-intro { padding:5.2rem 0 1.8rem 1rem; min-height:285px; }
 .cm-landing-intro h1 { max-width:800px; }
