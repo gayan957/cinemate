@@ -11,6 +11,19 @@ system does not invent titles.
 
 ---
 
+## Screenshots
+
+**Sign in** — the landing page.
+
+![CineMate login screen](docs/screenshots/login.png)
+
+**Ask in plain English** — a question and the three matches it returns, each
+with a short spoiler-free note and a poster.
+
+![CineMate recommendations for "give me funny alien movies"](docs/screenshots/recommendations.png)
+
+---
+
 ## What makes it different
 
 Instead of one large program, the work is split between four small programs
