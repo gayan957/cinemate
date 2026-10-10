@@ -273,15 +273,41 @@ def results(result: dict[str, Any]) -> None:
         unsafe_allow_html=True,
     )
     posters = result.get("posters") or []
-    cards = st.columns(len(matches), gap="medium")
-    for index, (column, recommendation) in enumerate(zip(cards, matches), start=1):
-        with column:
-            st.markdown(media_card_html(recommendation, posters, index), unsafe_allow_html=True)
+    answer = result.get("answer")
+    if answer:
+        explanation_column, recommendations_column = st.columns(
+            [1, 2.4], gap="large", vertical_alignment="top"
+        )
+        with explanation_column:
+            with st.container(key="cm_recommendation_explanation"):
+                st.markdown(
+                    '<span class="cm-eyebrow">WHY THESE PICKS</span>'
+                    '<h3 class="cm-explanation-title">Your recommendations</h3>',
+                    unsafe_allow_html=True,
+                )
+                st.markdown(answer)
+        with recommendations_column:
+            cards = st.columns(len(matches), gap="small")
+            for index, (column, recommendation) in enumerate(
+                zip(cards, matches), start=1
+            ):
+                with column:
+                    st.markdown(
+                        media_card_html(recommendation, posters, index),
+                        unsafe_allow_html=True,
+                    )
+    else:
+        cards = st.columns(len(matches), gap="medium")
+        for index, (column, recommendation) in enumerate(
+            zip(cards, matches), start=1
+        ):
+            with column:
+                st.markdown(
+                    media_card_html(recommendation, posters, index),
+                    unsafe_allow_html=True,
+                )
 
     with st.container(key="cm_result_details"):
-        if result.get("answer"):
-            with st.expander("CineMate's recommendation explanation"):
-                st.markdown(result["answer"])
         with st.expander("Sources and agent details"):
             for recommendation in matches:
                 title = recommendation.get("title") or "Unknown title"
